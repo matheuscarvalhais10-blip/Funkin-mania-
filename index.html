@@ -1,0 +1,488 @@
+```html
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Funkin' Mania - Ultra Definitive</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Fredoka+One&display=swap');
+
+        :root {
+            --color-left: #FF1B71;
+            --color-down: #00F0FF;
+            --color-up: #12FF00;
+            --color-right: #FFBD00;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Fredoka One', cursive;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Barra de Vida - Estável */
+        .health-bar-container {
+            position: absolute;
+            bottom: 150px;
+            width: 380px;
+            height: 20px;
+            background: #ff0000; /* Lado do oponente */
+            border: 4px solid #fff;
+            border-radius: 10px;
+            z-index: 60;
+            overflow: visible;
+        }
+
+        #health-fill {
+            height: 100%;
+            width: 50%; /* Começa no meio */
+            background: #00ff00; /* Lado do player */
+            transition: width 0.1s linear;
+            float: right; /* Preenche da direita para a esquerda */
+        }
+
+        #health-icons {
+            position: absolute;
+            top: -20px;
+            width: 100px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            transform: translateX(-50%);
+            transition: left 0.1s linear;
+            pointer-events: none;
+        }
+
+        /* Progresso da Música */
+        #song-bar {
+            position: absolute;
+            top: 20px;
+            width: 250px;
+            height: 6px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 3px;
+        }
+        #song-fill {
+            width: 0%;
+            height: 100%;
+            background: #fff;
+        }
+
+        /* Gameplay */
+        .receptors {
+            position: absolute;
+            top: 50px;
+            display: flex;
+            gap: 15px;
+            z-index: 50;
+        }
+
+        .receptor {
+            width: 65px;
+            height: 65px;
+            border: 4px solid rgba(255,255,255,0.2);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            color: rgba(255,255,255,0.5);
+        }
+
+        .receptor.active { transform: scale(1.1); filter: brightness(1.5); }
+
+        .note {
+            position: absolute;
+            width: 65px;
+            height: 65px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 45;
+            font-size: 1.8rem;
+            color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        .stage {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 65%;
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-end;
+            padding-bottom: 60px;
+            pointer-events: none;
+        }
+
+        .char-box {
+            width: 180px;
+            height: 280px;
+            transition: transform 0.1s;
+        }
+
+        /* Poses */
+        .pose-left { transform: translateX(-20px); }
+        .pose-down { transform: translateY(20px); }
+        .pose-up { transform: translateY(-20px); }
+        .pose-right { transform: translateX(20px); }
+
+        /* Telas */
+        .screen {
+            z-index: 100;
+            text-align: center;
+            color: white;
+            background: rgba(0,0,0,0.9);
+            padding: 2.5rem;
+            border-radius: 25px;
+            border: 4px solid #ff00ea;
+        }
+
+        .btn-ui {
+            background: #fff;
+            color: #000;
+            padding: 12px 25px;
+            margin: 10px;
+            border-radius: 12px;
+            font-size: 1.3rem;
+            width: 260px;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+        .btn-ui:hover { transform: scale(1.05); background: #ff00ea; color: #fff; }
+
+        .controls {
+            position: absolute;
+            bottom: 30px;
+            display: flex;
+            gap: 15px;
+            z-index: 100;
+        }
+
+        .btn-ctrl {
+            width: 70px;
+            height: 70px;
+            border-radius: 15px;
+            color: white;
+            font-size: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 0 #000;
+        }
+
+        .feedback-text {
+            position: absolute;
+            top: 30%;
+            font-family: 'Permanent Marker';
+            font-size: 3.5rem;
+            z-index: 100;
+            animation: popFeedback 0.4s ease-out forwards;
+        }
+
+        @keyframes popFeedback {
+            0% { transform: scale(0.5); opacity: 0; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(1); opacity: 0; transform: translateY(-30px); }
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <!-- Menu Principal -->
+    <div id="menu-main" class="screen">
+        <h1 class="text-6xl mb-10 text-pink-500 font-black italic">FUNKIN' MANIA</h1>
+        <button class="btn-ui" onclick="openLevels()">JOGAR</button>
+    </div>
+
+    <!-- Seleção de Fases -->
+    <div id="menu-levels" class="screen hidden">
+        <h2 class="text-3xl mb-6">ESCOLHA A WEEK</h2>
+        <div class="flex flex-col gap-2">
+            <button class="btn-ui" onclick="initGame(0)">WEEK 1 (Tutorial)</button>
+            <button class="btn-ui" onclick="initGame(1)">WEEK 2 (Normal)</button>
+            <button class="btn-ui" onclick="initGame(2)">WEEK 3 (Hard)</button>
+            <button class="btn-ui" onclick="initGame(3)">WEEK 4 (Expert)</button>
+            <button class="btn-ui" onclick="initGame(4)">WEEK 5 (God)</button>
+        </div>
+        <button class="mt-4 underline" onclick="backToMenu()">VOLTAR</button>
+    </div>
+
+    <!-- Interface do Jogo -->
+    <div id="game-ui" class="hidden w-full h-full relative">
+        <div id="song-bar"><div id="song-fill"></div></div>
+
+        <div class="receptors w-full justify-center">
+            <div id="rec-0" class="receptor" style="border-color: var(--color-left)">←</div>
+            <div id="rec-1" class="receptor" style="border-color: var(--color-down)">↓</div>
+            <div id="rec-2" class="receptor" style="border-color: var(--color-up)">↑</div>
+            <div id="rec-3" class="receptor" style="border-color: var(--color-right)">→</div>
+        </div>
+
+        <div id="notes-container" class="absolute inset-0 pointer-events-none"></div>
+
+        <div class="stage">
+            <div id="opponent" class="char-box">
+                <svg viewBox="0 0 100 150">
+                    <rect id="opp-body" x="20" y="40" width="60" height="100" rx="10" fill="red"/>
+                    <circle id="opp-head" cx="50" cy="35" r="30" fill="#ff7777"/>
+                    <rect x="35" y="30" width="8" height="4" fill="black"/>
+                    <rect x="57" y="30" width="8" height="4" fill="black"/>
+                </svg>
+            </div>
+            <div id="player" class="char-box">
+                <svg viewBox="0 0 100 150">
+                    <rect x="20" y="40" width="60" height="100" rx="10" fill="#0077ff"/>
+                    <circle cx="50" cy="35" r="30" fill="#77ccff"/>
+                    <rect x="35" y="30" width="6" height="6" fill="black"/>
+                    <rect x="59" y="30" width="6" height="6" fill="black"/>
+                </svg>
+            </div>
+        </div>
+
+        <div class="health-bar-container">
+            <div id="health-fill"></div>
+            <div id="health-icons">
+                <div id="icon-opp" style="width: 50px; height: 50px; background: red; border: 3px solid white; border-radius: 8px;"></div>
+                <div id="icon-pla" style="width: 50px; height: 50px; background: #0077ff; border: 3px solid white; border-radius: 8px; margin-left: -5px;"></div>
+            </div>
+        </div>
+
+        <div class="controls w-full justify-center">
+            <div class="btn-ctrl" style="background: var(--color-left)" onmousedown="input(0)" ontouchstart="input(0)">←</div>
+            <div class="btn-ctrl" style="background: var(--color-down)" onmousedown="input(1)" ontouchstart="input(1)">↓</div>
+            <div class="btn-ctrl" style="background: var(--color-up)" onmousedown="input(2)" ontouchstart="input(2)">↑</div>
+            <div class="btn-ctrl" style="background: var(--color-right)" onmousedown="input(3)" ontouchstart="input(3)">→</div>
+        </div>
+    </div>
+
+    <!-- Game Over -->
+    <div id="screen-over" class="screen hidden">
+        <h2 class="text-6xl text-red-600 mb-6 font-black italic">GAME OVER</h2>
+        <button class="btn-ui" onclick="backToMenu()">TENTAR NOVAMENTE</button>
+    </div>
+</div>
+
+<script>
+    const levelData = [
+        { speed: 4, rate: 1000, body: "#ff3333", head: "#ff7777", time: 40 },
+        { speed: 5.5, rate: 800, body: "#33ccff", head: "#aaeeff", time: 50 },
+        { speed: 7, rate: 650, body: "#ffcc00", head: "#ffee55", time: 60 },
+        { speed: 8.5, rate: 500, body: "#9900ff", head: "#cc88ff", time: 70 },
+        { speed: 10, rate: 400, body: "#222222", head: "#444444", time: 80 }
+    ];
+
+    let state = {
+        active: false,
+        health: 50,
+        notes: [],
+        level: 0,
+        timer: 0,
+        maxTime: 0,
+        spawnInt: null,
+        isEnding: false
+    };
+
+    function openLevels() {
+        document.getElementById('menu-main').classList.add('hidden');
+        document.getElementById('menu-levels').classList.remove('hidden');
+    }
+
+    function backToMenu() {
+        location.reload(); // Forma mais segura de resetar o estado total
+    }
+
+    function initGame(idx) {
+        state.level = idx;
+        state.health = 50;
+        state.active = true;
+        state.isEnding = false;
+        state.timer = 0;
+        state.maxTime = levelData[idx].time;
+        state.notes = [];
+
+        document.getElementById('menu-levels').classList.add('hidden');
+        document.getElementById('screen-over').classList.add('hidden');
+        document.getElementById('game-ui').classList.remove('hidden');
+
+        // Configurar cores do inimigo
+        document.getElementById('opp-body').setAttribute('fill', levelData[idx].body);
+        document.getElementById('opp-head').setAttribute('fill', levelData[idx].head);
+        document.getElementById('icon-opp').style.background = levelData[idx].body;
+
+        updateHealthUI();
+        
+        state.spawnInt = setInterval(() => {
+            if (state.timer < state.maxTime - 3) createNote();
+        }, levelData[idx].rate);
+
+        requestAnimationFrame(update);
+    }
+
+    function createNote() {
+        if (!state.active || state.isEnding) return;
+        const lane = Math.floor(Math.random() * 4);
+        const el = document.createElement('div');
+        el.className = 'note';
+        el.style.backgroundColor = ['var(--color-left)', 'var(--color-down)', 'var(--color-up)', 'var(--color-right)'][lane];
+        el.innerText = ['←','↓','↑','→'][lane];
+        
+        const rec = document.getElementById(`rec-${lane}`).getBoundingClientRect();
+        el.style.left = rec.left + 'px';
+        
+        let y = window.innerHeight;
+        el.style.top = y + 'px';
+        
+        document.getElementById('notes-container').appendChild(el);
+        state.notes.push({ el, lane, y, hit: false });
+        
+        if (Math.random() > 0.4) animateChar('opponent', lane);
+    }
+
+    function update() {
+        if (!state.active) return;
+
+        // Progress da música
+        state.timer += 0.016;
+        const progress = (state.timer / state.maxTime) * 100;
+        document.getElementById('song-fill').style.width = Math.min(progress, 100) + "%";
+
+        if (state.timer >= state.maxTime && !state.isEnding) {
+            winGame();
+        }
+
+        const speed = levelData[state.level].speed;
+        const targetY = 50;
+
+        for (let i = state.notes.length - 1; i >= 0; i--) {
+            const n = state.notes[i];
+            n.y -= speed;
+            n.el.style.top = n.y + 'px';
+
+            if (n.y < -60 && !n.hit) {
+                modifyHealth(-8);
+                feedback("MISS", "red");
+                n.el.remove();
+                state.notes.splice(i, 1);
+            }
+        }
+
+        if (state.health <= 0) gameOver();
+
+        requestAnimationFrame(update);
+    }
+
+    function input(lane) {
+        if (!state.active || state.isEnding) return;
+
+        const rec = document.getElementById(`rec-${lane}`);
+        rec.classList.add('active');
+        setTimeout(() => rec.classList.remove('active'), 100);
+        animateChar('player', lane);
+
+        const targetY = 50;
+        const range = 65;
+        let found = false;
+
+        for (let i = 0; i < state.notes.length; i++) {
+            const n = state.notes[i];
+            if (n.lane === lane && !n.hit) {
+                const dist = Math.abs(n.y - targetY);
+                if (dist < range) {
+                    found = true;
+                    n.hit = true;
+                    n.el.remove();
+                    let sick = dist < 25;
+                    modifyHealth(sick ? 6 : 3);
+                    feedback(sick ? "SICK!" : "GOOD", sick ? "#00f0ff" : "#00ff00");
+                    break;
+                }
+            }
+        }
+        if (!found) modifyHealth(-4);
+    }
+
+    function modifyHealth(val) {
+        state.health = Math.max(0, Math.min(100, state.health + val));
+        updateHealthUI();
+    }
+
+    function updateHealthUI() {
+        const fill = document.getElementById('health-fill');
+        const icons = document.getElementById('health-icons');
+        fill.style.width = state.health + "%";
+        // Mantém o ícone centralizado na divisa entre o verde e o vermelho
+        icons.style.left = (100 - state.health) + "%";
+    }
+
+    function animateChar(id, lane) {
+        const char = document.getElementById(id);
+        const poses = ['pose-left', 'pose-down', 'pose-up', 'pose-right'];
+        char.classList.remove(...poses);
+        void char.offsetWidth;
+        char.classList.add(poses[lane]);
+        setTimeout(() => char.classList.remove(poses[lane]), 150);
+    }
+
+    function feedback(txt, col) {
+        const d = document.createElement('div');
+        d.className = 'feedback-text';
+        d.style.color = col;
+        d.innerText = txt;
+        d.style.left = (window.innerWidth/2 - 60) + "px";
+        document.getElementById('game-container').appendChild(d);
+        setTimeout(() => d.remove(), 400);
+    }
+
+    function winGame() {
+        state.isEnding = true;
+        clearInterval(state.spawnInt);
+        feedback("CLEAR!", "#00ff00");
+        setTimeout(() => {
+            state.active = false;
+            document.getElementById('game-ui').classList.add('hidden');
+            document.getElementById('menu-levels').classList.remove('hidden');
+        }, 2500);
+    }
+
+    function gameOver() {
+        state.active = false;
+        clearInterval(state.spawnInt);
+        document.getElementById('game-ui').classList.add('hidden');
+        document.getElementById('screen-over').classList.remove('hidden');
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') input(0);
+        if (e.key === 'ArrowDown') input(1);
+        if (e.key === 'ArrowUp') input(2);
+        if (e.key === 'ArrowRight') input(3);
+    });
+</script>
+</body>
+</html>
+
+```
